@@ -76,6 +76,9 @@ class Config:
     board_variant_blacklist = []
     dnp_field = ''
 
+    # User styling
+    user_style_dir = None
+
     @staticmethod
     def _split(s):
         """Splits string by ',' and drops empty strings from resulting array."""
@@ -88,11 +91,13 @@ class Config:
     def __init__(self, version):
         self.version = version
 
-    def load_from_ini(self):
+    def load_from_ini(self, file=None):
         """Init from config file if it exists."""
-        if not os.path.isfile(self.config_file):
+        if file is None:
+            file = self.config_file
+        if not os.path.isfile(file):
             return
-        f = FileConfig(localFilename=self.config_file)
+        f = FileConfig(localFilename=file)
 
         f.SetPath('/html_defaults')
         self.dark_mode = f.ReadBool('dark_mode', self.dark_mode)
@@ -290,6 +295,13 @@ class Config:
         parser.add_argument('--show-dialog', action='store_true',
                             help='Shows config dialog. All other flags '
                                  'will be ignored.')
+        # Fixed configuration input.
+        parser.add_argument('--config', default=None,
+                            help='Fixed configuration file, overriding '
+                                 'all command line options')
+        # Custom styling.
+        parser.add_argument('--user-style-dir', default=None,
+                            help='Directory containing user styling files.')
         # Html
         parser.add_argument('--dark-mode', help='Default to dark mode.',
                             action='store_true')
@@ -376,6 +388,12 @@ class Config:
     def set_from_args(self, args):
         # type: (argparse.Namespace) -> None
         import math
+
+        # Fixed configuration file
+        if args.config is not None:
+            self.load_from_ini(args.config)
+            self.bom_dest_dir = args.dest_dir
+            return
 
         # Html
         self.dark_mode = args.dark_mode

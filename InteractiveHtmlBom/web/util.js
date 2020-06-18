@@ -30,6 +30,12 @@ function readStorage(key) {
 }
 
 function writeStorage(key, value) {
+  // TODO: DECIDE HOW TO DEAL WITH THIS PROPERLY. ON THE ONE HAND,
+  // IT'S NICE FOR USERS TO BE ABLE TO PERSIST THEIR SETTINGS ACROSS
+  // DIFFERENT BOARDS, BUT FOR THE KITSPACE USE CASE IT MAY MAKE MORE
+  // SENSE TO HAVE A "HOUSE STYLE" THAT APPEARS ON INITIAL LOAD, WHICH
+  // MEANS *NOT* PERSISTING THESE SETTINGS.
+  return;
   if (storage) {
     storage.setItem(storagePrefix + key, value);
   }
