@@ -393,6 +393,7 @@ class Config:
         if args.config is not None:
             self.load_from_ini(args.config)
             self.bom_dest_dir = args.dest_dir
+            self.user_style_dir = args.user_style_dir
             return
 
         # Html
