@@ -1,7 +1,5 @@
 /* Utility functions */
 
-var storagePrefix = 'KiCad_HTML_BOM__' + pcbdata.metadata.title + '__' +
-  pcbdata.metadata.revision + '__#';
 var storage;
 
 function initStorage(key) {
@@ -21,23 +19,22 @@ function initStorage(key) {
   }
 }
 
+function storagePrefix() {
+  return 'KiCad_HTML_BOM__' + pcbdata.metadata.title + '__' +
+         pcbdata.metadata.revision + '__#';
+}
+
 function readStorage(key) {
   if (storage) {
-    return storage.getItem(storagePrefix + key);
+    return storage.getItem(storagePrefix() + key);
   } else {
     return null;
   }
 }
 
 function writeStorage(key, value) {
-  // TODO: DECIDE HOW TO DEAL WITH THIS PROPERLY. ON THE ONE HAND,
-  // IT'S NICE FOR USERS TO BE ABLE TO PERSIST THEIR SETTINGS ACROSS
-  // DIFFERENT BOARDS, BUT FOR THE KITSPACE USE CASE IT MAY MAKE MORE
-  // SENSE TO HAVE A "HOUSE STYLE" THAT APPEARS ON INITIAL LOAD, WHICH
-  // MEANS *NOT* PERSISTING THESE SETTINGS.
-  return;
   if (storage) {
-    storage.setItem(storagePrefix + key, value);
+    storage.setItem(storagePrefix() + key, value);
   }
 }
 
@@ -537,7 +534,7 @@ const IBOM_EVENT_TYPES = {
 const EventHandler = {
   callbacks: {},
   init: function() {
-    for (eventType of Object.values(IBOM_EVENT_TYPES))
+    for (var eventType of Object.values(IBOM_EVENT_TYPES))
       this.callbacks[eventType] = [];
   },
   registerCallback: function(eventType, callback) {

@@ -45,6 +45,10 @@
 ///////////////////////////////////////////////
 ///USERJS///
 ///////////////////////////////////////////////
+
+window.onload = initBOM;
+window.onresize = resizeAll;
+window.matchMedia("print").addListener(resizeAll);
   </script>
 </head>
 
