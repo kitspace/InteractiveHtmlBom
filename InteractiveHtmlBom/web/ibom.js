@@ -74,7 +74,7 @@ function setDarkMode(value) {
 
 function setFullscreen(value) {
   if (value) {
-    document.documentElement.requestFullscreen();
+    document.getElementById("topmostdiv").requestFullscreen();
   } else {
     document.exitFullscreen();
   }
