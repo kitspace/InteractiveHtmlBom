@@ -46,13 +46,14 @@ class PcbnewParser(EcadParser):
             pcbnew.S_ARC: "arc",
             pcbnew.S_POLYGON: "polygon",
             pcbnew.S_CURVE: "curve",
+            pcbnew.S_RECT: "rect",
         }.get(d.GetShape(), "")
         if shape == "":
             self.logger.info("Unsupported shape %s, skipping", d.GetShape())
             return None
         start = self.normalize(d.GetStart())
         end = self.normalize(d.GetEnd())
-        if shape == "segment":
+        if shape in ["segment", "rect"]:
             return {
                 "type": shape,
                 "start": start,
@@ -159,7 +160,7 @@ class PcbnewParser(EcadParser):
             "text": text,
             "height": height,
             "width": width,
-            "horiz_justify": d.GetHorizJustify(),
+            "justify": [d.GetHorizJustify(), d.GetVertJustify()],
             "thickness": thickness,
             "attr": attributes,
             "angle": angle
@@ -236,7 +237,6 @@ class PcbnewParser(EcadParser):
             layers.append("B")
         pos = self.normalize(pad.GetPosition())
         size = self.normalize(pad.GetSize())
-        is_pin1 = pad.GetPadName() in ['1', 'A', 'A1', 'P1', 'PAD1']
         angle = pad.GetOrientation() * -0.1
         shape_lookup = {
             pcbnew.PAD_SHAPE_RECT: "rect",
@@ -261,8 +261,6 @@ class PcbnewParser(EcadParser):
             "angle": angle,
             "shape": shape
         }
-        if is_pin1:
-            pad_dict['pin1'] = 1
         if shape == "custom":
             polygon_set = pad.GetCustomShapeAsPolygon()
             if polygon_set.HasHoles():
@@ -332,14 +330,18 @@ class PcbnewParser(EcadParser):
                 if pad_dict is not None:
                     pads.append((p.GetPadName(), pad_dict))
 
-            # If no pads have common 'first' pad name pick lexicographically.
-            pin1_pads = [p for p in pads if 'pin1' in p[1]]
-            if pads and not pin1_pads:
+            if pads:
+                # Try to guess first pin name.
                 pads = sorted(pads, key=lambda el: el[0])
+                pin1_pads = [p for p in pads if p[0] in ['1', 'A', 'A1', 'P1', 'PAD1']]
+                if pin1_pads:
+                    pin1_pad_name = pin1_pads[0][0]
+                else:
+                    # No pads have common first pin name, pick lexicographically smallest.
+                    pin1_pad_name = pads[0][0]
                 for pad_name, pad_dict in pads:
-                    if pad_name:
+                    if pad_name == pin1_pad_name:
                         pad_dict['pin1'] = 1
-                        break
 
             pads = [p[1] for p in pads]
 
@@ -391,14 +393,24 @@ class PcbnewParser(EcadParser):
         for zone in zones:  # type: pcbnew.ZONE_CONTAINER
             if not zone.IsFilled() or zone.GetIsKeepout():
                 continue
-            if zone.GetLayer() in [pcbnew.F_Cu, pcbnew.B_Cu]:
+            layers = [l for l in list(zone.GetLayerSet().Seq())
+                      if l in [pcbnew.F_Cu, pcbnew.B_Cu]]
+            for layer in layers:
+                try:
+                    poly_set = zone.GetFilledPolysList()
+                except TypeError:
+                    poly_set = zone.GetFilledPolysList(layer)
+                width = zone.GetMinThickness() * 1e-6
+                if (hasattr(zone, 'GetFilledPolysUseThickness') and
+                        not zone.GetFilledPolysUseThickness()):
+                    width = 0
                 zone_dict = {
-                    "polygons": self.parse_poly_set(zone.GetFilledPolysList()),
-                    "width": zone.GetMinThickness() * 1e-6,
+                    "polygons": self.parse_poly_set(poly_set),
+                    "width": width,
                 }
                 if self.config.include_nets:
                     zone_dict["net"] = zone.GetNetname()
-                result[zone.GetLayer()].append(zone_dict)
+                result[layer].append(zone_dict)
 
         return {
             'F': result.get(pcbnew.F_Cu),
@@ -421,12 +433,13 @@ class PcbnewParser(EcadParser):
         except AttributeError:
             footprint = str(module.GetFPID().GetLibItemName())
 
-        attr = module.GetAttributes()
-        attr = {
-            0: 'Normal',
-            1: 'Normal+Insert',
-            2: 'Virtual'
-        }.get(attr, str(attr))
+        attr = 'Normal'
+        if hasattr(pcbnew, 'MOD_EXCLUDE_FROM_BOM'):
+            if module.GetAttributes() & pcbnew.MOD_EXCLUDE_FROM_BOM:
+                attr = 'Virtual'
+        elif hasattr(pcbnew, 'MOD_VIRTUAL'):
+            if module.GetAttributes() == pcbnew.MOD_VIRTUAL:
+                attr = 'Virtual'
         layer = {
             pcbnew.F_Cu: 'F',
             pcbnew.B_Cu: 'B',
@@ -515,6 +528,7 @@ class InteractiveHtmlBomPlugin(pcbnew.ActionPlugin, object):
 
     def Run(self):
         from ..version import version
+        from ..errors import ParsingException
         self.version = version
         config = Config(self.version)
         board = pcbnew.GetBoard()
@@ -526,4 +540,7 @@ class InteractiveHtmlBomPlugin(pcbnew.ActionPlugin, object):
             return
 
         parser = PcbnewParser(pcb_file_name, config, logger, board)
-        ibom.run_with_dialog(parser, config, logger)
+        try:
+            ibom.run_with_dialog(parser, config, logger)
+        except ParsingException as e:
+            logger.error(str(e))
