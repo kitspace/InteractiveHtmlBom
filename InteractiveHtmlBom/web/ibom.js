@@ -74,7 +74,7 @@ function setDarkMode(value) {
 
 function setFullscreen(value) {
   if (value) {
-    document.documentElement.requestFullscreen();
+    document.getElementById("topmostdiv").requestFullscreen();
   } else {
     document.exitFullscreen();
   }
@@ -1007,7 +1007,7 @@ function hideNetlistButton() {
   document.getElementById("bom-netlist-btn").style.display = "none";
 }
 
-window.onload = function(e) {
+function initBOM(e) {
   initUtils();
   initRender();
   initStorage();
@@ -1033,6 +1033,3 @@ window.onload = function(e) {
       document.getElementById('fullscreenCheckbox').checked = false;
   });
 }
-
-window.onresize = resizeAll;
-window.matchMedia("print").addListener(resizeAll);
